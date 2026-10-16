@@ -1,6 +1,7 @@
 const gameMap = new Map(); // id → element
+const NBA_API_KEY = "2882471b-fbe1-4103-993e-c67b03af6c18"; 
 
-// Cập nhật ảnh, tỉ số
+// Cập nhật ảnh, tỉ số
 async function updateGameElement(el, game) {
   const date = new Date(game.datetime);
   // // ⏰ giờ phút (dòng trên)
@@ -95,7 +96,7 @@ function Card_sendComment(gameId, card) {
     card.querySelector(".content").value = "";
 
     // reload comment
-    loadComments(gameId, card);
+    Card_loadComments(gameId, card);
   });
 }
 
@@ -158,14 +159,35 @@ async function Guess_the_win_percent(game, card){
   }
 }
 
-/////////// Chèn lần đầu
+/////////// Chèn lần đầu
+
+function updateGames(data) {
+  data.data.forEach(game => {
+    const el = gameMap.get(game.id);
+
+    if (el) {
+      updateGameElement(el, game); 
+    }
+  });
+}
+function loadGames(first = false, t) {
+  return fetch(`https://api.balldontlie.io/v1/games?dates[]=${t}`, {
+    headers: { Authorization: NBA_API_KEY }
+  })
+  .then(res => res.json())
+  .then(data => {
+    console.log("loading");
+    if (first) initialRender(data);
+    else updateGames(data);
+  });
+}
+
 function initialRender(data) {
   // console.log(123);
   const container = document.getElementById("Result");
   const template = document.getElementById("game-template");
 
-  // container.innerHTML = "";
-  // gameMap.clear();
+
   data.data.sort((a, b) => {
     return new Date(b.datetime) - new Date(a.datetime);
   });
@@ -174,7 +196,9 @@ function initialRender(data) {
     const clone = template.content.cloneNode(true);
     const el = clone.querySelector(".card");
 
-    // console.log(game.datetime);
+    //debug
+    console.log(game.id, game.home_team.full_name, "vs", game.visitor_team.full_name);
+
     el.dataset.id = game.id;
     // 
     // 
@@ -202,50 +226,60 @@ function initialRender(data) {
   });
 } 
 
-function updateGames(data) {
-  data.data.forEach(game => {
-    const el = gameMap.get(game.id);
+async function FirstloadGames(first = false) {
+  console.log("FirstloadGames được gọi");
+  console.log("Ngày:", { tm, t, y });
 
-    if (el) {
-      updateGameElement(el, game); // 🔥 chỉ update số
+  const params = new URLSearchParams();
+  [tm, t, y].forEach(date => {
+    if (date && date !== "undefined") {
+      params.append("dates[]", date);
     }
   });
+  params.set("per_page", "100");
+
+  try {
+    const res = await fetch(
+      `https://api.balldontlie.io/v1/games?${params}`,
+      {
+        headers: {
+          Authorization: NBA_API_KEY
+        }
+      }
+    );
+
+    console.log("HTTP status:", res.status);
+
+    const body = await res.text();
+    console.log("API response:", body);
+
+    if (!res.ok) {
+      console.error("API lỗi:", res.status, body);
+      return;
+    }
+
+    const data = JSON.parse(body);
+
+    console.log("Số trận:", data.data?.length);
+
+    if (!Array.isArray(data.data)) {
+      console.error("API không trả về mảng data:", data);
+      return;
+    }
+
+    initialRender(data);
+  } catch (error) {
+    console.error("Lỗi tải trận đấu:", error);
+  }
 }
 
-function loadGames(first = false, t) {
-  return fetch(`https://api.balldontlie.io/v1/games?dates[]=${t}`, {
-    headers: { Authorization: "fc0fc756-6f9c-426e-86ba-c5c47fcd4ed2" }
-  })
-  .then(res => res.json())
-  .then(data => {
-    console.log("loading");
-    if (first) initialRender(data);
-    else updateGames(data);
-  });
-}
-
-function FirstloadGames(first = false) {
-  fetch(`https://api.balldontlie.io/v1/games?dates[]=${tm}&dates[]=${t}&dates[]=${y}`, {
-    headers: { Authorization: "fc0fc756-6f9c-426e-86ba-c5c47fcd4ed2" }
-  })
-  .then(res => res.json())
-  .then(data => {
-    console.log("loading");
-    if (first) initialRender(data);
-    else updateGames(data);
-  });
-}
-
-
-
-// Chuẩn hóa ngày
+// Chuẩn hóa ngày
 function formatDate(date) {
     return date.getFullYear() + "-" +
         String(date.getMonth() + 1).padStart(2, "0") + "-" +
         String(date.getDate()).padStart(2, "0");
 } 
 async function loadOlder() {
-  // ⬅️ lùi 1 ngày
   // console.days_ago
   days_ago++;
   let old_date = new Date(today);
@@ -276,10 +310,3 @@ FirstloadGames(true);
 console.log("Yesterday:", y);
 console.log("Today:", t);
 console.log("Tomorrow:", tm);
-
-// // mỗi 10s
-// setInterval(() => {
-//   if (!document.hidden) {
-//     loadGames(false);
-//   }
-// }, 10000);

@@ -11,13 +11,16 @@ app.use(express.json());
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
-  // password: "123456",
   password: process.env.DB_PASS,
   database: process.env.DB_NAME
 });
 
 db.connect(err => {
-  if (err) throw err;
+  if (err){
+    // throw err;
+    console.log("MySQL connection error: ");
+    return;  
+  }
   console.log("MySQL connected");
 });
 
@@ -120,50 +123,50 @@ async function askAI(prompt) {
   });
 }
 
-// Lấy tên đội
-app.post("/win_percent", async (req, res) => {
-  try {
-    const { home_team, visitor_team } = req.body;
+// // Guess the win percent
+// app.post("/win_percent", async (req, res) => {
+//   try {
+//     const { home_team, visitor_team } = req.body;
 
-    console.log("Guess the win percent of ", home_team, " ", visitor_team);
+//     console.log("Guess the win percent of ", home_team, " ", visitor_team);
 
-    const prompt = `
-    You are an NBA prediction API.
+//     const prompt = `
+//     You are an NBA prediction API.
 
-    Predict the winning probability for this NBA game.
+//     Predict the winning probability for this NBA game.
 
-    Home team: ${home_team}
-    Visitor team: ${visitor_team}
+//     Home team: ${home_team}
+//     Visitor team: ${visitor_team}
 
-    Rules:
-    - Return ONLY valid JSON
-    - No markdown
-    - No explanation
-    - Total must equal 100
-    - Use numbers only
+//     Rules:
+//     - Return ONLY valid JSON
+//     - No markdown
+//     - No explanation
+//     - Total must equal 100
+//     - Use numbers only
 
-    Format:
-    {
-      "home_team": number,
-      "visitor_team": number
-    }
-    `;
+//     Format:
+//     {
+//       "home_team": number,
+//       "visitor_team": number
+//     }
+//     `;
 
-    const answer=await askAI(prompt);
-    const text = answer.choices[0].message.content;
+//     const answer=await askAI(prompt);
+//     const text = answer.choices[0].message.content;
 
-    console.log(text);
-    const result = JSON.parse(text);
-    res.json(result);
+//     console.log(text);
+//     const result = JSON.parse(text);
+//     res.json(result);
 
     
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Gemini API failed"
-    });
-  }
-});
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({
+//       error: "Gemini API failed"
+//     });
+//   }
+// });
 
 
 // chạy server
