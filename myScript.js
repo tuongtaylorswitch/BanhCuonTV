@@ -1,6 +1,6 @@
 const gameMap = new Map(); // id → element
 
-// Cập nhật ảnh, tỉ số
+// Cập nhật ảnh, tỉ số
 async function updateGameElement(el, game) {
   const date = new Date(game.datetime);
   // // ⏰ giờ phút (dòng trên)
@@ -95,10 +95,9 @@ function Card_sendComment(gameId, card) {
     card.querySelector(".content").value = "";
 
     // reload comment
-    loadComments(gameId, card);
+    Card_loadComments(gameId, card);
   });
 }
-
 async function Guess_the_win_percent(game, card){
   // Send teams name to server
   try {
@@ -158,14 +157,34 @@ async function Guess_the_win_percent(game, card){
   }
 }
 
-/////////// Chèn lần đầu
+/////////// -------------------- Update each game
+function updateGames(data) {
+  data.data.forEach(game => {
+    const el = gameMap.get(game.id);
+
+    if (el) {
+      updateGameElement(el, game); 
+    }
+  });
+}
+function loadGames(first = false, t) {
+  return fetch(`http://localhost:3000/games?dates=${t}`)
+  .then(res => res.json())
+  .then(data => {
+    console.log("loading");
+    if (first) initialRender(data);
+    else updateGames(data);
+  });
+}
+
+
+/////////// -------------------- Update first game
 function initialRender(data) {
   // console.log(123);
   const container = document.getElementById("Result");
   const template = document.getElementById("game-template");
 
-  // container.innerHTML = "";
-  // gameMap.clear();
+
   data.data.sort((a, b) => {
     return new Date(b.datetime) - new Date(a.datetime);
   });
@@ -174,7 +193,9 @@ function initialRender(data) {
     const clone = template.content.cloneNode(true);
     const el = clone.querySelector(".card");
 
-    // console.log(game.datetime);
+    //debug
+    console.log(game.id, game.home_team.full_name, "vs", game.visitor_team.full_name);
+
     el.dataset.id = game.id;
     // 
     // 
@@ -201,51 +222,43 @@ function initialRender(data) {
     gameMap.set(game.id, el); // 🔥 lưu lại
   });
 } 
+async function FirstloadGames(first = false) {
+  console.log("FirstloadGames được gọi");
+  console.log("Ngày:", { tm, t, y });
 
-function updateGames(data) {
-  data.data.forEach(game => {
-    const el = gameMap.get(game.id);
+  const dates = [tm, t, y].filter(d => d && d !== "undefined").join(",");
 
-    if (el) {
-      updateGameElement(el, game); // 🔥 chỉ update số
+  try {
+    const res = await fetch(`http://localhost:3000/games?dates=${dates}`);
+    console.log("HTTP status:", res.status);
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error("API lỗi:", res.status, data);
+      return;
     }
-  });
+
+    console.log("Số trận:", data.data?.length);
+
+    if (!Array.isArray(data.data)) {
+      console.error("API không trả về mảng data:", data);
+      return;
+    }
+
+    initialRender(data);
+  } catch (error) {
+    console.error("Lỗi tải trận đấu:", error);
+  }
 }
 
-function loadGames(first = false, t) {
-  return fetch(`https://api.balldontlie.io/v1/games?dates[]=${t}`, {
-    headers: { Authorization: "fc0fc756-6f9c-426e-86ba-c5c47fcd4ed2" }
-  })
-  .then(res => res.json())
-  .then(data => {
-    console.log("loading");
-    if (first) initialRender(data);
-    else updateGames(data);
-  });
-}
-
-function FirstloadGames(first = false) {
-  fetch(`https://api.balldontlie.io/v1/games?dates[]=${tm}&dates[]=${t}&dates[]=${y}`, {
-    headers: { Authorization: "fc0fc756-6f9c-426e-86ba-c5c47fcd4ed2" }
-  })
-  .then(res => res.json())
-  .then(data => {
-    console.log("loading");
-    if (first) initialRender(data);
-    else updateGames(data);
-  });
-}
-
-
-
-// Chuẩn hóa ngày
+// Chuẩn hóa ngày
 function formatDate(date) {
     return date.getFullYear() + "-" +
         String(date.getMonth() + 1).padStart(2, "0") + "-" +
         String(date.getDate()).padStart(2, "0");
 } 
 async function loadOlder() {
-  // ⬅️ lùi 1 ngày
   // console.days_ago
   days_ago++;
   let old_date = new Date(today);
@@ -276,10 +289,3 @@ FirstloadGames(true);
 console.log("Yesterday:", y);
 console.log("Today:", t);
 console.log("Tomorrow:", tm);
-
-// // mỗi 10s
-// setInterval(() => {
-//   if (!document.hidden) {
-//     loadGames(false);
-//   }
-// }, 10000);
