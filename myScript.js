@@ -1,5 +1,4 @@
 const gameMap = new Map(); // id → element
-const NBA_API_KEY = "2882471b-fbe1-4103-993e-c67b03af6c18"; 
 
 // Cập nhật ảnh, tỉ số
 async function updateGameElement(el, game) {
@@ -99,7 +98,6 @@ function Card_sendComment(gameId, card) {
     Card_loadComments(gameId, card);
   });
 }
-
 async function Guess_the_win_percent(game, card){
   // Send teams name to server
   try {
@@ -159,8 +157,7 @@ async function Guess_the_win_percent(game, card){
   }
 }
 
-/////////// Chèn lần đầu
-
+/////////// -------------------- Update each game
 function updateGames(data) {
   data.data.forEach(game => {
     const el = gameMap.get(game.id);
@@ -171,9 +168,7 @@ function updateGames(data) {
   });
 }
 function loadGames(first = false, t) {
-  return fetch(`https://api.balldontlie.io/v1/games?dates[]=${t}`, {
-    headers: { Authorization: NBA_API_KEY }
-  })
+  return fetch(`http://localhost:3000/games?dates=${t}`)
   .then(res => res.json())
   .then(data => {
     console.log("loading");
@@ -182,6 +177,8 @@ function loadGames(first = false, t) {
   });
 }
 
+
+/////////// -------------------- Update first game
 function initialRender(data) {
   // console.log(123);
   const container = document.getElementById("Result");
@@ -225,40 +222,22 @@ function initialRender(data) {
     gameMap.set(game.id, el); // 🔥 lưu lại
   });
 } 
-
 async function FirstloadGames(first = false) {
   console.log("FirstloadGames được gọi");
   console.log("Ngày:", { tm, t, y });
 
-  const params = new URLSearchParams();
-  [tm, t, y].forEach(date => {
-    if (date && date !== "undefined") {
-      params.append("dates[]", date);
-    }
-  });
-  params.set("per_page", "100");
+  const dates = [tm, t, y].filter(d => d && d !== "undefined").join(",");
 
   try {
-    const res = await fetch(
-      `https://api.balldontlie.io/v1/games?${params}`,
-      {
-        headers: {
-          Authorization: NBA_API_KEY
-        }
-      }
-    );
-
+    const res = await fetch(`http://localhost:3000/games?dates=${dates}`);
     console.log("HTTP status:", res.status);
 
-    const body = await res.text();
-    console.log("API response:", body);
+    const data = await res.json();
 
     if (!res.ok) {
-      console.error("API lỗi:", res.status, body);
+      console.error("API lỗi:", res.status, data);
       return;
     }
-
-    const data = JSON.parse(body);
 
     console.log("Số trận:", data.data?.length);
 

@@ -1,3 +1,6 @@
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
+
 const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
@@ -122,51 +125,53 @@ async function askAI(prompt) {
     model: "openai/gpt-oss-20b",
   });
 }
+// ===== Proxy NBA (balldontlie) =====
+const NBA_API_KEY = process.env.NBA_API_KEY; 
+const gamesCache = new Map(); 
+const GAMES_CACHE_TTL = 15 * 1000; 
+app.get("/games", async (req, res) => {
+  try {
+    // /games?dates=2026-10-15,2026-10-16,2026-10-17  (1 ngày hoặc nhiều ngày)
+    const dates = String(req.query.dates || "")
+      .split(",")
+      .map(d => d.trim())
+      .filter(d => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .slice(0, 7); // giới hạn tối đa 7 ngày/lần
 
-// // Guess the win percent
-// app.post("/win_percent", async (req, res) => {
-//   try {
-//     const { home_team, visitor_team } = req.body;
+    if (dates.length === 0) {
+      return res.status(400).json({ error: "Thiếu hoặc sai định dạng dates (YYYY-MM-DD)" });
+    }
 
-//     console.log("Guess the win percent of ", home_team, " ", visitor_team);
+    const key = [...dates].sort().join(",");
+    const cached = gamesCache.get(key);
+    if (cached && Date.now() - cached.time < GAMES_CACHE_TTL) {
+      return res.json(cached.data);
+    }
 
-//     const prompt = `
-//     You are an NBA prediction API.
+    const params = new URLSearchParams();
+    dates.forEach(d => params.append("dates[]", d));
+    params.set("per_page", "100");
 
-//     Predict the winning probability for this NBA game.
+    const r = await fetch(`https://api.balldontlie.io/v1/games?${params}`, {
+      headers: { Authorization: NBA_API_KEY }
+    });
 
-//     Home team: ${home_team}
-//     Visitor team: ${visitor_team}
+    if (!r.ok) {
+      const text = await r.text();
+      console.error("NBA API lỗi:", r.status, text);
+      // lỗi (vd 429) thì trả cache cũ nếu có
+      if (cached) return res.json(cached.data);
+      return res.status(r.status).json({ error: "NBA API lỗi", status: r.status });
+    }
 
-//     Rules:
-//     - Return ONLY valid JSON
-//     - No markdown
-//     - No explanation
-//     - Total must equal 100
-//     - Use numbers only
-
-//     Format:
-//     {
-//       "home_team": number,
-//       "visitor_team": number
-//     }
-//     `;
-
-//     const answer=await askAI(prompt);
-//     const text = answer.choices[0].message.content;
-
-//     console.log(text);
-//     const result = JSON.parse(text);
-//     res.json(result);
-
-    
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({
-//       error: "Gemini API failed"
-//     });
-//   }
-// });
+    const data = await r.json();
+    gamesCache.set(key, { time: Date.now(), data });
+    res.json(data);
+  } catch (err) {
+    console.error("Lỗi /games:", err);
+    res.status(500).json({ error: "Server lỗi" });
+  }
+});
 
 
 // chạy server
